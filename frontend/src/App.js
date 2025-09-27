@@ -1,8 +1,8 @@
 import React, { useState, useEffect, createContext, useContext } from "react";
 import "./App.css";
-import { BrowserRouter, Routes, Route, Link, useNavigate, useLocation } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Link, useNavigate, useLocation, useParams } from "react-router-dom";
 import axios from "axios";
-import { gamesData, getGamesPage, getFeaturedGames, searchGames } from "./data.js";
+import { gamesData, getGamesPage, getFeaturedGames, searchGames, getGameBySlug, getRelatedGames } from "./data.js";
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 const API = `${BACKEND_URL}/api`;
@@ -54,48 +54,149 @@ const AuthProvider = ({ children }) => {
 
 const useAuth = () => useContext(AuthContext);
 
-// Components
-const Header = () => {
-  const { user, login, logout } = useAuth();
-  const [mobileMenu, setMobileMenu] = useState(false);
+// Modal Component
+const Modal = ({ isOpen, onClose, title, children }) => {
+  if (!isOpen) return null;
 
   return (
-    <header className="header">
-      <nav className="nav-container">
-        <Link to="/" className="logo">
-          <span className="logo-text">GameStack</span>
-        </Link>
-        
-        <div className={`nav-links ${mobileMenu ? 'nav-links-mobile' : ''}`}>
-          <Link to="/" className="nav-link" onClick={() => setMobileMenu(false)}>Inicio</Link>
-          <Link to="/juegos" className="nav-link" onClick={() => setMobileMenu(false)}>Juegos</Link>
-          <Link to="/contacto" className="nav-link" onClick={() => setMobileMenu(false)}>Contacto</Link>
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-header">
+          <h2>{title}</h2>
+          <button className="modal-close" onClick={onClose}>&times;</button>
         </div>
-
-        <div className="auth-section">
-          {user ? (
-            <div className="user-menu">
-              <img src={user.picture || '/default-avatar.png'} alt="Usuario" className="user-avatar" />
-              <span className="user-name">{user.name}</span>
-              <button onClick={logout} className="logout-btn">Salir</button>
-            </div>
-          ) : (
-            <button onClick={login} className="login-btn">Iniciar Sesión</button>
-          )}
+        <div className="modal-body">
+          {children}
         </div>
-
-        <button 
-          className="mobile-menu-btn"
-          onClick={() => setMobileMenu(!mobileMenu)}
-        >
-          ☰
-        </button>
-      </nav>
-    </header>
+      </div>
+    </div>
   );
 };
 
-const GameCard = ({ game, isFavorite, onToggleFavorite }) => {
+// Header Component
+const Header = () => {
+  const { user, login, logout } = useAuth();
+  const [mobileMenu, setMobileMenu] = useState(false);
+  const [activeModal, setActiveModal] = useState(null);
+
+  const openModal = (modalType) => {
+    setActiveModal(modalType);
+  };
+
+  const closeModal = () => {
+    setActiveModal(null);
+  };
+
+  return (
+    <>
+      <header className="header">
+        <nav className="nav-container">
+          <Link to="/" className="logo">
+            <span className="logo-text">GamesfullZ</span>
+            <span className="version-badge">v2.0</span>
+          </Link>
+          
+          <div className={`nav-links ${mobileMenu ? 'nav-links-mobile' : ''}`}>
+            <Link to="/" className="nav-link" onClick={() => setMobileMenu(false)}>Inicio</Link>
+            <Link to="/juegos" className="nav-link" onClick={() => setMobileMenu(false)}>Juegos</Link>
+            <Link to="/contacto" className="nav-link" onClick={() => setMobileMenu(false)}>Contacto</Link>
+          </div>
+
+          <div className="floating-buttons">
+            <button onClick={() => openModal('about')} className="floating-btn" title="Quién soy">
+              👤
+            </button>
+            <button onClick={() => openModal('privacy')} className="floating-btn" title="Privacidad">
+              🔒
+            </button>
+            <button onClick={() => openModal('legal')} className="floating-btn" title="Legal">
+              ⚖️
+            </button>
+          </div>
+
+          <div className="auth-section">
+            {user ? (
+              <div className="user-menu">
+                <img src={user.picture || '/default-avatar.png'} alt="Usuario" className="user-avatar" />
+                <span className="user-name">{user.name}</span>
+                <button onClick={logout} className="logout-btn">Salir</button>
+              </div>
+            ) : (
+              <button onClick={login} className="login-btn">Iniciar Sesión</button>
+            )}
+          </div>
+
+          <button 
+            className="mobile-menu-btn"
+            onClick={() => setMobileMenu(!mobileMenu)}
+          >
+            ☰
+          </button>
+        </nav>
+      </header>
+
+      {/* Modals */}
+      <Modal isOpen={activeModal === 'about'} onClose={closeModal} title="Quién Soy">
+        <div className="modal-text">
+          <p>¡Bienvenido a <strong>GamesfullZ</strong>!</p>
+          <p>Soy el creador de esta plataforma dedicada a compartir los mejores juegos con la comunidad gaming. 
+          Mi objetivo es proporcionar un acceso fácil y rápido a una amplia variedad de juegos para todos los gustos.</p>
+          <p>GamesfullZ nació de mi pasión por los videojuegos y el deseo de crear un espacio donde los gamers 
+          puedan encontrar, descargar y disfrutar de sus títulos favoritos.</p>
+          <p><strong>Versión 2.0</strong> - Ahora con mejor diseño, más funcionalidades y una experiencia de usuario mejorada.</p>
+        </div>
+      </Modal>
+
+      <Modal isOpen={activeModal === 'privacy'} onClose={closeModal} title="Política de Privacidad">
+        <div className="modal-text">
+          <h3>Recopilación de Información</h3>
+          <p>Recopilamos información mínima necesaria para proporcionar nuestros servicios, como datos de autenticación 
+          a través de nuestro sistema OAuth.</p>
+          
+          <h3>Uso de la Información</h3>
+          <p>La información recopilada se utiliza exclusivamente para:</p>
+          <ul>
+            <li>Proporcionar acceso a funciones personalizadas</li>
+            <li>Mantener las preferencias del usuario</li>
+            <li>Mejorar la experiencia en la plataforma</li>
+          </ul>
+          
+          <h3>Protección de Datos</h3>
+          <p>Nos comprometemos a proteger tu información personal y no la compartimos con terceros sin tu consentimiento.</p>
+          
+          <h3>Cookies</h3>
+          <p>Utilizamos cookies esenciales para el funcionamiento del sitio y la autenticación de usuarios.</p>
+        </div>
+      </Modal>
+
+      <Modal isOpen={activeModal === 'legal'} onClose={closeModal} title="Términos Legales">
+        <div className="modal-text">
+          <h3>Términos de Uso</h3>
+          <p>Al utilizar GamesfullZ, aceptas cumplir con estos términos y condiciones.</p>
+          
+          <h3>Contenido</h3>
+          <p>Todo el contenido proporcionado es solo para fines educativos e informativos. 
+          Los usuarios son responsables del uso que hagan del contenido descargado.</p>
+          
+          <h3>Responsabilidad</h3>
+          <p>GamesfullZ no se hace responsable por el mal uso de los archivos descargados o 
+          por cualquier daño que pueda resultar de su uso.</p>
+          
+          <h3>Derechos de Autor</h3>
+          <p>Respetamos los derechos de propiedad intelectual. Si eres titular de derechos y consideras 
+          que se está infringiendo tu propiedad, contáctanos.</p>
+          
+          <h3>Modificaciones</h3>
+          <p>Nos reservamos el derecho de modificar estos términos en cualquier momento. 
+          Los cambios serán efectivos inmediatamente después de su publicación.</p>
+        </div>
+      </Modal>
+    </>
+  );
+};
+
+// Game Card Component for listings
+const GameCard = ({ game, isFavorite, onToggleFavorite, compact = false }) => {
   const { user } = useAuth();
 
   const handleDirectLink = () => {
@@ -107,49 +208,60 @@ const GameCard = ({ game, isFavorite, onToggleFavorite }) => {
   };
 
   return (
-    <div className="game-card">
-      <div className="game-image-container">
-        <img src={game.image} alt={game.title} className="game-image" />
-        {user && (
-          <button 
-            className={`favorite-btn ${isFavorite ? 'favorited' : ''}`}
-            onClick={() => onToggleFavorite(game.id)}
-          >
-            {isFavorite ? '❤️' : '🤍'}
-          </button>
-        )}
-      </div>
-      
-      <div className="game-content">
-        <h3 className="game-title">{game.title}</h3>
-        <p className="game-description">{game.description}</p>
+    <div className={`game-card ${compact ? 'compact' : ''}`}>
+      <Link to={`/juegos/${game.slug}`} className="game-card-link">
+        <div className="game-image-container">
+          <img src={game.image} alt={game.title} className="game-image" />
+          {user && (
+            <button 
+              className={`favorite-btn ${isFavorite ? 'favorited' : ''}`}
+              onClick={(e) => {
+                e.preventDefault();
+                onToggleFavorite(game.id);
+              }}
+            >
+              {isFavorite ? '❤️' : '🤍'}
+            </button>
+          )}
+          <div className="game-overlay">
+            <span className="view-details">Ver Detalles</span>
+          </div>
+        </div>
         
-        <div className="game-metadata">
-          <span className="game-category">{game.category}</span>
-          <span className="game-rating">⭐ {game.rating}</span>
-          <span className="game-downloads">📥 {game.downloads}</span>
-          <span className="game-size">💾 {game.size}</span>
-        </div>
+        <div className="game-content">
+          <h3 className="game-title">{game.title}</h3>
+          {!compact && <p className="game-description">{game.description}</p>}
+          
+          <div className="game-metadata">
+            <span className="game-category">{game.category}</span>
+            <span className="game-rating">⭐ {game.rating}</span>
+            <span className="game-downloads">📥 {game.downloads}</span>
+            <span className="game-size">💾 {game.size}</span>
+          </div>
 
-        <div className="game-tags">
-          {game.tags.map(tag => (
-            <span key={tag} className="tag">{tag}</span>
-          ))}
+          {!compact && (
+            <div className="game-tags">
+              {game.tags.slice(0, 3).map(tag => (
+                <span key={tag} className="tag">{tag}</span>
+              ))}
+            </div>
+          )}
         </div>
-
-        <div className="download-buttons">
-          <button onClick={handleDirectLink} className="download-btn direct">
-            Descarga Directa
-          </button>
-          <button onClick={handleShortLink} className="download-btn short">
-            Con Acortador
-          </button>
-        </div>
+      </Link>
+      
+      <div className="download-buttons">
+        <button onClick={handleDirectLink} className="download-btn direct">
+          Descarga Directa
+        </button>
+        <button onClick={handleShortLink} className="download-btn short">
+          Con Acortador
+        </button>
       </div>
     </div>
   );
 };
 
+// Home Component
 const Home = () => {
   const featuredGames = getFeaturedGames();
   const [favorites, setFavorites] = useState([]);
@@ -196,9 +308,12 @@ const Home = () => {
     <div className="home">
       <section className="hero">
         <div className="hero-content">
-          <h1 className="hero-title">Bienvenido a GameStack</h1>
+          <div className="welcome-badge">
+            <span>🎮 Bienvenido a la nueva versión</span>
+          </div>
+          <h1 className="hero-title">GamesfullZ v2.0</h1>
           <p className="hero-subtitle">
-            La mejor plataforma para descargar tus juegos favoritos
+            La evolución de tu plataforma favorita de juegos. Ahora más rápida, más bella y con mejores funcionalidades.
           </p>
           <div className="hero-stats">
             <div className="stat">
@@ -206,17 +321,22 @@ const Home = () => {
               <span className="stat-label">Juegos</span>
             </div>
             <div className="stat">
-              <span className="stat-number">1.2M+</span>
+              <span className="stat-number">2.8M+</span>
               <span className="stat-label">Descargas</span>
             </div>
             <div className="stat">
-              <span className="stat-number">50K+</span>
+              <span className="stat-number">85K+</span>
               <span className="stat-label">Usuarios</span>
             </div>
           </div>
-          <Link to="/juegos" className="cta-button">
-            Explorar Juegos
-          </Link>
+          <div className="hero-buttons">
+            <Link to="/juegos" className="cta-button primary">
+              Explorar Juegos
+            </Link>
+            <button className="cta-button secondary">
+              Ver Novedades
+            </button>
+          </div>
         </div>
       </section>
 
@@ -233,18 +353,46 @@ const Home = () => {
           ))}
         </div>
       </section>
+
+      <section className="stats-section">
+        <h2 className="section-title">Estadísticas de GamesfullZ</h2>
+        <div className="stats-grid">
+          <div className="stat-card">
+            <span className="stat-icon">🎮</span>
+            <span className="stat-value">{gamesData.length}</span>
+            <span className="stat-desc">Juegos Disponibles</span>
+          </div>
+          <div className="stat-card">
+            <span className="stat-icon">📥</span>
+            <span className="stat-value">2.8M+</span>
+            <span className="stat-desc">Total de Descargas</span>
+          </div>
+          <div className="stat-card">
+            <span className="stat-icon">👥</span>
+            <span className="stat-value">85K+</span>
+            <span className="stat-desc">Usuarios Registrados</span>
+          </div>
+          <div className="stat-card">
+            <span className="stat-icon">📦</span>
+            <span className="stat-value">12</span>
+            <span className="stat-desc">Colecciones</span>
+          </div>
+        </div>
+      </section>
     </div>
   );
 };
 
+// Games Listing Component
 const Games = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [favorites, setFavorites] = useState([]);
+  const [sortBy, setSortBy] = useState('recent');
   const { user } = useAuth();
   
-  const itemsPerPage = 6;
+  const itemsPerPage = 12;
 
   useEffect(() => {
     if (user) {
@@ -294,6 +442,21 @@ const Games = () => {
       filteredGames = filteredGames.filter(game => game.category === selectedCategory);
     }
 
+    // Sorting
+    switch (sortBy) {
+      case 'recent':
+        filteredGames.sort((a, b) => new Date(b.updateDate) - new Date(a.updateDate));
+        break;
+      case 'popular':
+        filteredGames.sort((a, b) => parseFloat(b.downloads.replace('k', '')) - parseFloat(a.downloads.replace('k', '')));
+        break;
+      case 'rating':
+        filteredGames.sort((a, b) => b.rating - a.rating);
+        break;
+      default:
+        break;
+    }
+
     return filteredGames;
   };
 
@@ -308,48 +471,70 @@ const Games = () => {
     <div className="games-page">
       <div className="games-header">
         <h1>Todos los Juegos</h1>
-        <p>Explora nuestra colección completa de juegos</p>
+        <p>En esta sección se muestran todos los juegos disponibles en GamesfullZ. También puedes buscar juegos por categorías.</p>
       </div>
 
       <div className="games-filters">
-        <div className="search-bar">
-          <input
-            type="text"
-            placeholder="Buscar juegos..."
-            value={searchTerm}
-            onChange={(e) => {
-              setSearchTerm(e.target.value);
-              setCurrentPage(1);
-            }}
-            className="search-input"
-          />
+        <div className="search-sort-container">
+          <div className="search-bar">
+            <input
+              type="text"
+              placeholder="Buscar juegos..."
+              value={searchTerm}
+              onChange={(e) => {
+                setSearchTerm(e.target.value);
+                setCurrentPage(1);
+              }}
+              className="search-input"
+            />
+          </div>
+          
+          <div className="sort-container">
+            <label>Ordenar por:</label>
+            <select 
+              value={sortBy} 
+              onChange={(e) => setSortBy(e.target.value)}
+              className="sort-select"
+            >
+              <option value="recent">Recién actualizados</option>
+              <option value="popular">Más descargados</option>
+              <option value="rating">Mejor valorados</option>
+            </select>
+          </div>
         </div>
 
         <div className="category-filter">
-          {categories.map(category => (
-            <button
-              key={category}
-              onClick={() => {
-                setSelectedCategory(category);
-                setCurrentPage(1);
-              }}
-              className={`category-btn ${selectedCategory === category ? 'active' : ''}`}
-            >
-              {category === 'all' ? 'Todos' : category}
-            </button>
-          ))}
+          <h3>Ver categorías</h3>
+          <p>Todos los juegos ordenados por categorías</p>
+          <div className="category-buttons">
+            {categories.map(category => (
+              <button
+                key={category}
+                onClick={() => {
+                  setSelectedCategory(category);
+                  setCurrentPage(1);
+                }}
+                className={`category-btn ${selectedCategory === category ? 'active' : ''}`}
+              >
+                {category === 'all' ? 'Todos' : category}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
-      <div className="games-grid">
-        {currentGames.map(game => (
-          <GameCard 
-            key={game.id} 
-            game={game}
-            isFavorite={favorites.includes(game.id)}
-            onToggleFavorite={toggleFavorite}
-          />
-        ))}
+      <div className="games-grid-container">
+        <div className="games-grid listing">
+          {currentGames.map(game => (
+            <GameCard 
+              key={game.id} 
+              game={game}
+              isFavorite={favorites.includes(game.id)}
+              onToggleFavorite={toggleFavorite}
+              compact={true}
+            />
+          ))}
+        </div>
       </div>
 
       {totalPages > 1 && (
@@ -363,15 +548,28 @@ const Games = () => {
           </button>
           
           <div className="pagination-numbers">
-            {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
-              <button
-                key={page}
-                onClick={() => setCurrentPage(page)}
-                className={`pagination-number ${currentPage === page ? 'active' : ''}`}
-              >
-                {page}
-              </button>
-            ))}
+            {Array.from({ length: Math.min(totalPages, 5) }, (_, i) => {
+              let page;
+              if (totalPages <= 5) {
+                page = i + 1;
+              } else if (currentPage <= 3) {
+                page = i + 1;
+              } else if (currentPage >= totalPages - 2) {
+                page = totalPages - 4 + i;
+              } else {
+                page = currentPage - 2 + i;
+              }
+              
+              return (
+                <button
+                  key={page}
+                  onClick={() => setCurrentPage(page)}
+                  className={`pagination-number ${currentPage === page ? 'active' : ''}`}
+                >
+                  {page}
+                </button>
+              );
+            })}
           </div>
           
           <button 
@@ -387,6 +585,304 @@ const Games = () => {
   );
 };
 
+// Individual Game Page Component
+const GameDetail = () => {
+  const { slug } = useParams();
+  const game = getGameBySlug(slug);
+  const [userRating, setUserRating] = useState(0);
+  const [review, setReview] = useState('');
+  const [gameRatings, setGameRatings] = useState(null);
+  const [favorites, setFavorites] = useState([]);
+  const { user } = useAuth();
+
+  useEffect(() => {
+    if (game) {
+      loadGameRatings();
+      if (user) {
+        loadFavorites();
+      }
+    }
+  }, [game, user]);
+
+  const loadGameRatings = async () => {
+    try {
+      const response = await axios.get(`${API}/ratings/${game.id}`);
+      setGameRatings(response.data);
+    } catch (error) {
+      console.error('Error loading ratings:', error);
+    }
+  };
+
+  const loadFavorites = async () => {
+    try {
+      const response = await axios.get(`${API}/favorites`, {
+        withCredentials: true
+      });
+      setFavorites(response.data.map(fav => fav.game_id));
+    } catch (error) {
+      console.error('Error loading favorites:', error);
+    }
+  };
+
+  const handleRatingSubmit = async () => {
+    if (!user || userRating === 0) return;
+
+    try {
+      await axios.post(`${API}/ratings`, {
+        game_id: game.id,
+        rating: userRating,
+        review: review
+      }, { withCredentials: true });
+      
+      loadGameRatings();
+      setUserRating(0);
+      setReview('');
+    } catch (error) {
+      console.error('Error submitting rating:', error);
+    }
+  };
+
+  const toggleFavorite = async () => {
+    if (!user) return;
+
+    try {
+      if (favorites.includes(game.id)) {
+        await axios.delete(`${API}/favorites/${game.id}`, {
+          withCredentials: true
+        });
+        setFavorites(favorites.filter(id => id !== game.id));
+      } else {
+        await axios.post(`${API}/favorites/${game.id}`, {}, {
+          withCredentials: true
+        });
+        setFavorites([...favorites, game.id]);
+      }
+    } catch (error) {
+      console.error('Error toggling favorite:', error);
+    }
+  };
+
+  if (!game) {
+    return (
+      <div className="game-not-found">
+        <h1>Juego no encontrado</h1>
+        <p>El juego que buscas no existe o ha sido removido.</p>
+        <Link to="/juegos" className="cta-button">Volver a Juegos</Link>
+      </div>
+    );
+  }
+
+  const relatedGames = getRelatedGames(game.id, 6);
+
+  return (
+    <div className="game-detail">
+      <div className="game-hero">
+        <div className="game-hero-background">
+          <img src={game.wallpaper} alt={game.title} />
+        </div>
+        <div className="game-hero-content">
+          <div className="game-hero-info">
+            <div className="game-stats">
+              <span className="visits">{game.visits}</span>
+              <span className="downloads">{game.downloads}</span>
+              <div className="rating">
+                <span className="rating-score">{game.userRating}</span>
+                <div className="rating-details">
+                  {gameRatings && <span>({gameRatings.total_ratings})</span>}
+                </div>
+              </div>
+            </div>
+            
+            <div className="game-poster-container">
+              <img src={game.image} alt={game.title} className="game-poster" />
+              <button className="gameplay-btn">Ver Gameplay</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="game-content">
+        <div className="game-main">
+          <div className="game-header-section">
+            <h1>{game.title}</h1>
+            <p className="game-full-description">{game.fullDescription}</p>
+            
+            <div className="game-tags-section">
+              {game.tags.map(tag => (
+                <Link key={tag} to={`/categorias/${tag.toLowerCase()}`} className="game-tag">
+                  {tag}
+                </Link>
+              ))}
+            </div>
+          </div>
+
+          <div className="game-info-grid">
+            <div className="game-info-card">
+              <h3>Información del Juego</h3>
+              <div className="info-item">
+                <span className="label">Lanzamiento:</span>
+                <span className="value">{new Date(game.releaseDate).toLocaleDateString('es-ES')}</span>
+              </div>
+              <div className="info-item">
+                <span className="label">Actualización:</span>
+                <span className="value">{new Date(game.updateDate).toLocaleDateString('es-ES')}</span>
+              </div>
+              <div className="info-item">
+                <span className="label">Versión:</span>
+                <span className="value">{game.version}</span>
+              </div>
+              <div className="info-item">
+                <span className="label">Tamaño:</span>
+                <span className="value">{game.size}</span>
+              </div>
+              <div className="info-item">
+                <span className="label">Crack:</span>
+                <span className="value">{game.crack}</span>
+              </div>
+              <div className="info-item">
+                <span className="label">Idioma:</span>
+                <span className="value">{game.language}</span>
+              </div>
+            </div>
+
+            <div className="download-section">
+              <div className="download-buttons-main">
+                <button 
+                  onClick={() => window.open(game.directLink, '_blank')} 
+                  className="download-btn-main direct"
+                >
+                  Descarga Directa
+                </button>
+                <button 
+                  onClick={() => window.open(game.shortLink, '_blank')} 
+                  className="download-btn-main short"
+                >
+                  Con Acortador
+                </button>
+              </div>
+              
+              {user && (
+                <button 
+                  onClick={toggleFavorite}
+                  className={`favorite-btn-main ${favorites.includes(game.id) ? 'favorited' : ''}`}
+                >
+                  {favorites.includes(game.id) ? '❤️ En Favoritos' : '🤍 Añadir a Favoritos'}
+                </button>
+              )}
+            </div>
+          </div>
+
+          <div className="requirements-section">
+            <h3>Requisitos del Sistema</h3>
+            <div className="requirements-grid">
+              <div className="requirements-card">
+                <h4>Mínimos</h4>
+                <div className="req-item">
+                  <span>SO: {game.requirements.minimum.os}</span>
+                </div>
+                <div className="req-item">
+                  <span>Procesador: {game.requirements.minimum.processor}</span>
+                </div>
+                <div className="req-item">
+                  <span>Memoria: {game.requirements.minimum.memory}</span>
+                </div>
+                <div className="req-item">
+                  <span>Gráficos: {game.requirements.minimum.graphics}</span>
+                </div>
+                <div className="req-item">
+                  <span>Almacenamiento: {game.requirements.minimum.storage}</span>
+                </div>
+              </div>
+              
+              <div className="requirements-card">
+                <h4>Recomendados</h4>
+                <div className="req-item">
+                  <span>SO: {game.requirements.recommended.os}</span>
+                </div>
+                <div className="req-item">
+                  <span>Procesador: {game.requirements.recommended.processor}</span>
+                </div>
+                <div className="req-item">
+                  <span>Memoria: {game.requirements.recommended.memory}</span>
+                </div>
+                <div className="req-item">
+                  <span>Gráficos: {game.requirements.recommended.graphics}</span>
+                </div>
+                <div className="req-item">
+                  <span>Almacenamiento: {game.requirements.recommended.storage}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {user && (
+            <div className="rating-section">
+              <h3>Valora este juego</h3>
+              <div className="rating-form">
+                <div className="star-rating">
+                  {[1, 2, 3, 4, 5].map(star => (
+                    <button
+                      key={star}
+                      onClick={() => setUserRating(star)}
+                      className={`star ${star <= userRating ? 'active' : ''}`}
+                    >
+                      ⭐
+                    </button>
+                  ))}
+                </div>
+                <textarea
+                  placeholder="Escribe tu reseña (opcional)..."
+                  value={review}
+                  onChange={(e) => setReview(e.target.value)}
+                  className="review-textarea"
+                />
+                <button onClick={handleRatingSubmit} className="submit-rating-btn">
+                  Enviar Valoración
+                </button>
+              </div>
+            </div>
+          )}
+
+          {gameRatings && gameRatings.ratings.length > 0 && (
+            <div className="reviews-section">
+              <h3>Reseñas y Puntuación</h3>
+              <div className="reviews-list">
+                {gameRatings.ratings.slice(0, 5).map((rating, index) => (
+                  <div key={index} className="review-item">
+                    <div className="review-header">
+                      <span className="reviewer-name">Usuario {index + 1}</span>
+                      <span className="review-rating">⭐ {rating.rating}</span>
+                    </div>
+                    {rating.review && <p className="review-text">{rating.review}</p>}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {relatedGames.length > 0 && (
+        <div className="related-games-section">
+          <h3>Juegos Relacionados</h3>
+          <div className="games-grid">
+            {relatedGames.map(relatedGame => (
+              <GameCard 
+                key={relatedGame.id} 
+                game={relatedGame}
+                isFavorite={favorites.includes(relatedGame.id)}
+                onToggleFavorite={toggleFavorite}
+                compact={true}
+              />
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// Contact Component
 const Contact = () => {
   const [formData, setFormData] = useState({
     name: '',
@@ -396,7 +892,6 @@ const Contact = () => {
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    // Here you would typically send the form data to your backend
     alert('¡Mensaje enviado! Te contactaremos pronto.');
     setFormData({ name: '', email: '', message: '' });
   };
@@ -412,11 +907,11 @@ const Contact = () => {
             <h3>Información de Contacto</h3>
             <div className="contact-item">
               <span className="contact-icon">📧</span>
-              <span>info@gamestack.com</span>
+              <span>info@gamesfullz.com</span>
             </div>
             <div className="contact-item">
               <span className="contact-icon">🌐</span>
-              <span>www.gamestack.com</span>
+              <span>www.gamesfullz.com</span>
             </div>
             <div className="contact-item">
               <span className="contact-icon">⏰</span>
@@ -471,6 +966,7 @@ const Contact = () => {
   );
 };
 
+// Dashboard Component
 const Dashboard = () => {
   const { user, setUser } = useAuth();
   const navigate = useNavigate();
@@ -499,6 +995,9 @@ const Dashboard = () => {
           
           // Clear the URL hash
           window.history.replaceState({}, document.title, window.location.pathname);
+          
+          // Redirect to games page
+          setTimeout(() => navigate('/juegos'), 1500);
           
         } catch (error) {
           console.error('Error processing session:', error);
@@ -535,13 +1034,13 @@ const Dashboard = () => {
     <div className="dashboard">
       <div className="dashboard-header">
         <h1>¡Bienvenido, {user.name}!</h1>
-        <p>Accede a funciones exclusivas como favoritos y valoraciones</p>
+        <p>Acceso completo a GamesfullZ v2.0 con funciones exclusivas</p>
       </div>
       
       <div className="dashboard-redirect">
-        <p>Serás redirigido al catálogo de juegos...</p>
+        <p>Serás redirigido al catálogo de juegos en unos segundos...</p>
         <Link to="/juegos" className="cta-button">
-          Ver Juegos
+          Ir a Juegos Ahora
         </Link>
       </div>
     </div>
@@ -558,6 +1057,7 @@ function App() {
             <Routes>
               <Route path="/" element={<Home />} />
               <Route path="/juegos" element={<Games />} />
+              <Route path="/juegos/:slug" element={<GameDetail />} />
               <Route path="/contacto" element={<Contact />} />
               <Route path="/dashboard" element={<Dashboard />} />
             </Routes>
