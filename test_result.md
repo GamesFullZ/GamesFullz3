@@ -282,9 +282,6 @@ metadata:
 
 test_plan:
   current_focus:
-    - "Emergent Authentication System"
-    - "User Favorites System"
-    - "Game Rating System"
     - "Emergent Authentication Frontend"
     - "Favorites System UI"
   stuck_tasks: []
